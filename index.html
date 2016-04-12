@@ -9,21 +9,26 @@
 		#popup {
 			border: 1px solid white;
 			border-radius: 4px;
-			background-color: white;
+			color: white;
+			background-color: rgba(40,122,170,0.7);
 		}
 		th {text-align:left;}
 		table {
 			border-collapse: collapse;
 		}
+		table {
+			width: 100%;
+		}
 		table, th, td {
-			border: 1px solid black;
+			color: white;
+			border: 1px solid white;
 		}
 		#layer_selection_panel {
 			position: absolute;
 			top: 5px;
 			right: 0;
-			width: 200px;
-			height: 100px;
+			width: 250px;
+			height: 220px;
 			border: 3px solid rgba(148,146,151,0.7);
 			border-radius: 4px;
 			color: white;
@@ -37,29 +42,85 @@
     <div id="map" class="map">
 		<div id="popup"></div>
 		<div id="layer_selection_panel">
-			<input id="checkbox_routes" type="checkbox" name="show routes" value="Routes" onClick="select_layers(this)" checked />Routes<br/>
-			<input id="checkbox_activity_points" type="checkbox" name="show activity points" onClick="select_layers(this)" checked />Activity points<br/>
-			<input id="checkbox_filtered_points" type="checkbox" name="show filtered activity points" onClick="select_layers(this)" checked />Filtered activity points<br/>
-			<input id="checkbox_osm_bus_stops" type="checkbox" name="show bus stops from OSM" onClick="select_layers(this)" checked />Bus stops from OSM<br/>
+			<input id="checkbox_routes" type="checkbox" onClick="select_layers(this)" checked />Routes <img src="map/route.png" height="2" width="24"><br/>
+			<input id="checkbox_activity_points" type="checkbox" onClick="select_layers(this)" checked />Activity points <img src="map/activity_point.png" height="12" width="12"><br/>
+			<input id="checkbox_osm_bus_stops" type="checkbox" onClick="select_layers(this)" checked />OSM bus stops <img src="map/bus_stop.png" height="24" width="24"><br/>
+			<hr/>
+			Detected bus stops:<br/>
+			<input id="checkbox_detected_bus_stops_clustering1" type="checkbox" onClick="select_layers(this)" />Cluster-based (settings 1)<img src="map/bus_stop_orange.png" height="24" width="24"><br/>
+			<input id="checkbox_detected_bus_stops_clustering2" type="checkbox" onClick="select_layers(this)" />Cluster-based (settings 2)<img src="map/bus_stop_orange.png" height="24" width="24"><br/>
+			<input id="checkbox_detected_bus_stops_traversing1" type="checkbox" onClick="select_layers(this)" />Traversing-based (settings 1) <img src="map/bus_stop_pink.png" height="24" width="24"><br/>
+			<input id="checkbox_detected_bus_stops_traversing2" type="checkbox" onClick="select_layers(this)" />Traversing-based (settings 2) <img src="map/bus_stop_pink.png" height="24" width="24"><br/>
+
 		</div>	
 	</div>
     <script type="text/javascript">
+	/***************************************************************
+	* Style definitions
+	****************************************************************/
 	var styles = {
 		osm_bus_stop_style: new ol.style.Style({
 			image: new ol.style.Icon({
 				src: 'map/bus_stop.png',
-				scale: 0.08
-				})
+				scale: 0.1
 			})
+		}),
+		detected_stops_clustering_style: new ol.style.Style({
+			image: new ol.style.Icon({
+				src: 'map/bus_stop_orange.png',
+				scale: 0.1
+			})
+		}),
+		detected_stops_traversing_style: new ol.style.Style({
+			image: new ol.style.Icon({
+				src: 'map/bus_stop_pink.png',
+				scale: 0.1
+			})
+		}),
+		activity_point_style: new ol.style.Style({
+			image: new ol.style.Circle({
+				fill: new ol.style.Fill({
+					color: '#984ea3'
+				}),
+				stroke: new ol.style.Stroke({
+					color: 'black',
+					width: 1.25
+				}),
+				radius: 5,
+				snapToPixel: false
+			})
+		}),
+		involved_activity_point_style: new ol.style.Style({
+			image: new ol.style.Circle({
+				fill: new ol.style.Fill({
+					color: '#ff7f00'
+				}),
+				stroke: new ol.style.Stroke({
+					color: 'black',
+					width: 1.25
+				}),
+				radius: 5
+			})
+		}),
+		route_style: new ol.style.Style({
+			stroke: new ol.style.Stroke({
+				color: 'white',
+				width: 0
+			})
+		})
 	};
 	
+	/***************************************************************
+	* Layer initialization
+	****************************************************************/
 	var routes = new ol.layer.Vector({
 		source: new ol.source.Vector({
 			url: 'data/routes.geojson',
 			format: new ol.format.GeoJSON({
 				projection: 'EPSG:3857'
 			})
-		}) 
+		}),
+		style: styles['route_style']
 	});
 	
 	var activity_points = new ol.layer.Vector({
@@ -68,16 +129,8 @@
 			format: new ol.format.GeoJSON({
 				projection: 'EPSG:3857'
 			})
-		}) 
-	});
-
-	var filtered_points = new ol.layer.Vector({
-		source: new ol.source.Vector({
-			url: 'data/filtered_activity_points.geojson',
-			format: new ol.format.GeoJSON({
-				projection: 'EPSG:3857'
-			})
-		}) 
+		}),
+		style: styles['activity_point_style']
 	});
 	
 	var osm_bus_stops = new ol.layer.Vector({
@@ -90,8 +143,53 @@
 		style: styles['osm_bus_stop_style']
 	});
 	
+	var detected_bus_stops_clustering1 = new ol.layer.Vector({
+		source: new ol.source.Vector({
+			url: 'data/detected_bus_stops_clustering_approach_params1.geojson',
+			format: new ol.format.GeoJSON({
+				projection: 'EPSG:3857'
+			})
+		}),
+		style: styles['detected_stops_clustering_style'],
+		visible: false
+	});
+	
+	var detected_bus_stops_clustering2 = new ol.layer.Vector({
+		source: new ol.source.Vector({
+			url: 'data/detected_bus_stops_clustering_approach_params2.geojson',
+			format: new ol.format.GeoJSON({
+				projection: 'EPSG:3857'
+			})
+		}),
+		style: styles['detected_stops_clustering_style'],
+		visible: false
+	});
+	
+	var detected_bus_stops_traversing1 = new ol.layer.Vector({
+		source: new ol.source.Vector({
+			url: 'data/detected_bus_stops_traversing_approach_params1.geojson',
+			format: new ol.format.GeoJSON({
+				projection: 'EPSG:3857'
+			})
+		}),
+		style: styles['detected_stops_traversing_style'],
+		visible: false
+	});
+	
+	var detected_bus_stops_traversing2 = new ol.layer.Vector({
+		source: new ol.source.Vector({
+			url: 'data/detected_bus_stops_traversing_approach_params2.geojson',
+			format: new ol.format.GeoJSON({
+				projection: 'EPSG:3857'
+			})
+		}),
+		style: styles['detected_stops_traversing_style'],
+		visible: false
+	});	
 		
-			
+	/***************************************************************
+	* Map initialization
+	****************************************************************/		
 	var map = new ol.Map({
 		target: 'map',
 		layers: [
@@ -101,8 +199,11 @@
 				}),
 				routes,
 				activity_points,
-				filtered_points,
-				osm_bus_stops
+				osm_bus_stops,
+				detected_bus_stops_clustering1,
+				detected_bus_stops_clustering2,
+				detected_bus_stops_traversing1,
+				detected_bus_stops_traversing2
 				],
 		view: new ol.View({
 			center: ol.proj.transform([39.2702,-6.822517], 'EPSG:4326', 'EPSG:3857'),
@@ -110,6 +211,9 @@
 		})
 	});
 	
+	/***************************************************************
+	* Layer selection stuff
+	****************************************************************/
 	var layer_selection_container = document.getElementById('layer_selection_panel');
 	var layer_control = new ol.control.Control({
 		element: layer_selection_container
@@ -124,44 +228,88 @@
 			case 'checkbox_activity_points':
 				activity_points.setVisible(caller.checked);
 				break;
-			case 'checkbox_filtered_points':
-				filtered_points.setVisible(caller.checked);
-				break;
 			case 'checkbox_osm_bus_stops':
 				osm_bus_stops.setVisible(caller.checked);
 				break;
+			case 'checkbox_detected_bus_stops_clustering1':
+				detected_bus_stops_clustering1.setVisible(caller.checked);
+				break;
+			case 'checkbox_detected_bus_stops_clustering2':
+				detected_bus_stops_clustering2.setVisible(caller.checked);
+				break;
+			case 'checkbox_detected_bus_stops_traversing1':
+				detected_bus_stops_traversing1.setVisible(caller.checked);
+				break;
+			case 'checkbox_detected_bus_stops_traversing2':
+				detected_bus_stops_traversing2.setVisible(caller.checked);
+				break;					
 		}
 	};
 	
+	/***************************************************************
+	* Feature information overlay stuff
+	****************************************************************/
 	var popup_container = document.getElementById('popup');	
 	var popup = new ol.Overlay({
 		element: popup_container
 	});
 	map.addOverlay(popup);
+
+	
+	var involved_activity_points_overlay = new ol.layer.Vector({
+		source: new ol.source.Vector(),
+        map: map,
+		style: styles['involved_activity_point_style']
+      });
 	
 	
 	var show_feature_info = function(pixel, coordinate) {
+		involved_activity_points_overlay.getSource().clear();
+		
 		var activity_point_features = [];
-		var filtered_point_features = [];
 		var route_features = [];
 		var osm_bus_stop_features = [];
-		
+		var detected_bus_stops_clustering1_features = []
+		var detected_bus_stops_clustering2_features = []
+		var detected_bus_stops_traversing1_features = []
+		var detected_bus_stops_traversing2_features = []
+
+		var all_involved = new Set([]); // OpenLayers bug workaround
 		map.forEachFeatureAtPixel(pixel, function(feature, layer) {
-			if(layer==filtered_points){
-				filtered_point_features.push(feature);
-			} else if (layer==routes){
+			if (layer==routes){
 				route_features.push(feature);
 			} else if (layer==activity_points){
 				activity_point_features.push(feature);
 			} else if (layer==osm_bus_stops){
 				osm_bus_stop_features.push(feature);
+			} else if (layer==detected_bus_stops_clustering1){
+				detected_bus_stops_clustering1_features.push(feature);
+				var involved_activity_points = feature.get('activity_points');
+				for (var i = 0; i < activity_points.getSource().getFeatures().length; i++) {
+					if(involved_activity_points.indexOf(activity_points.getSource().getFeatures()[i].get('id')) != -1){
+						all_involved.add(activity_points.getSource().getFeatures()[i]);
+					}
+				}
+			} else if (layer==detected_bus_stops_clustering2){
+				detected_bus_stops_clustering2_features.push(feature);
+				var involved_activity_points = feature.get('activity_points');
+				for (var i = 0; i < activity_points.getSource().getFeatures().length; ++i) {
+					if(involved_activity_points.indexOf(activity_points.getSource().getFeatures()[i].get('id')) != -1){
+						all_involved.add(activity_points.getSource().getFeatures()[i]);
+					}
+				}
+			} else if (layer==detected_bus_stops_traversing1){
+				detected_bus_stops_traversing1_features.push(feature);
+			} else if (layer==detected_bus_stops_traversing2){
+				detected_bus_stops_traversing2_features.push(feature);
 			}
         });
+		involved_activity_points_overlay.getSource().addFeatures(Array.from(all_involved)); // OpenLayers bug workaround
 		
 		var popupHTML = '';
 		if (activity_point_features.length > 0) {
 			activity_point_features.sort();
-			popupHTML = 'Activity point(s):<br/><table><tr>'+
+			popupHTML = '<b>Activity point(s):</b><br/><table><tr>'+
 						'<th>id</th><th>previous activity (confidence)</th>'+
 						'<th>current activity (confidence)</th><th>speed</th></tr>';
 			for (var i = 0; i < activity_point_features.length; ++i) {
@@ -172,50 +320,70 @@
 							  ' ('+activity_point_features[i].get('current_dominating_activity_confidence')+')</td>'+
 							'<td>'+activity_point_features[i].get('speed')+'</td></tr>';
 			}
-			popupHTML = popupHTML+'</table>';
-		}
-		if (filtered_point_features.length > 0){
-			filtered_point_features.sort();
-			popupHTML = 'Filtered activity point(s):<br/><table><tr>'+
-						'<th>id</th><th>previous activity (confidence)</th>'+
-						'<th>current activity (confidence)</th><th>speed</th></tr>';
-			for (var i = 0; i < filtered_point_features.length; ++i) {
-				popupHTML = popupHTML+'<tr><td>'+filtered_point_features[i].get('id')+'</td>'+
-							'<td>'+filtered_point_features[i].get('previous_dominating_activity')+
-							  ' ('+filtered_point_features[i].get('previous_dominating_activity_confidence')+')</td>'+
-							'<td>'+filtered_point_features[i].get('current_dominating_activity')+
-							  ' ('+filtered_point_features[i].get('current_dominating_activity_confidence')+')</td>'+
-							'<td>'+filtered_point_features[i].get('speed')+'</td></tr>';
-			}
-			popupHTML = popupHTML+'</table>';
+			popupHTML = popupHTML+'</table><br/>';
 		}
 		if (osm_bus_stop_features.length > 0){
 			osm_bus_stop_features.sort();
-			popupHTML = 'OSM bus stop(s):<br/><table><tr><th>name</th></tr>';
+			popupHTML = '<b>OSM bus stop(s):</b><br/><table><tr><th>name</th></tr>';
 			for (var i = 0; i < osm_bus_stop_features.length; ++i) {
 				popupHTML = popupHTML+'<tr><td>'+osm_bus_stop_features[i].get('name')+'</td></tr>';
 			}
-			popupHTML = popupHTML+'</table>';
+			popupHTML = popupHTML+'</table><br/>';
 		}
 		if (route_features.length > 0){
-			route_features.sort()
-			popupHTML = popupHTML+'Route(s):<br/><table><tr><th>route_id</th></tr>';
+			route_features.sort();
+			popupHTML = popupHTML+'<b>Route(s):</b><br/><table><tr><th>route_id</th></tr>';
 			for (var i = 0; i < route_features.length; ++i) {
 				popupHTML = popupHTML+'<tr><td>'+route_features[i].get('route_id')+'</td></tr>';
 			}
-			popupHTML = popupHTML+'</table>';
+			popupHTML = popupHTML+'</table><br/>';
 		}
-
-		popupHTML.length>0 ? popup_container.style.border='1px solid white' : popup_container.style.border='0px';
+		if (detected_bus_stops_clustering1_features.length > 0){
+			popupHTML = popupHTML+'<b>Detected bus stop(s):</b><br/><i>(Cluster-based 1)</i><br/><table><tr><th># involved activity points</th></tr>';
+			for (var i = 0; i < detected_bus_stops_clustering1_features.length; ++i) {
+				popupHTML = popupHTML+'<tr><td>'+detected_bus_stops_clustering1_features[i].get('activity_points').length+'</td></tr>';
+			}
+			popupHTML = popupHTML+'</table><br/>';
+		}
+		if (detected_bus_stops_clustering2_features.length > 0){
+			popupHTML = popupHTML+'<b>Detected bus stop(s):</b><br/><i>(Cluster-based 2)</i><br/><table><tr><th># involved activity points</th></tr>';
+			for (var i = 0; i < detected_bus_stops_clustering2_features.length; ++i) {
+				popupHTML = popupHTML+'<tr><td>'+detected_bus_stops_clustering2_features[i].get('activity_points').length+'</td></tr>';
+			}
+			popupHTML = popupHTML+'</table><br/>';
+		}
+		if (detected_bus_stops_traversing1_features.length > 0){
+			popupHTML = popupHTML+'<b>Detected bus stop(s):</b><br/><i>(Traversing-based 1)</i><br/><table><tr><th>score</th></tr>';
+			for (var i = 0; i < detected_bus_stops_traversing1_features.length; ++i) {
+				popupHTML = popupHTML+'<tr><td>'+detected_bus_stops_traversing1_features[i].get('score')+'</td></tr>';
+			}
+			popupHTML = popupHTML+'</table><br/>';
+		}
+		if (detected_bus_stops_traversing2_features.length > 0){
+			popupHTML = popupHTML+'<b>Detected bus stop(s):</b><br/><i>(Traversing-based 2)</i><br/><table><tr><th>score</th></tr>';
+			for (var i = 0; i < detected_bus_stops_traversing2_features.length; ++i) {
+				popupHTML = popupHTML+'<tr><td>'+detected_bus_stops_traversing2_features[i].get('score')+'</td></tr>';
+			}
+			popupHTML = popupHTML+'</table><br/>';
+		}
+		last_break_index = popupHTML.lastIndexOf('<br/>');
+		if (last_break_index > -1){
+			popupHTML = popupHTML.slice(0,last_break_index);
+		}
+		popupHTML.length > 0 ? popup_container.style.visibility='visible' : popup_container.style.visibility='hidden';
 		popup_container.innerHTML =  popupHTML; 
         popup.setPositioning('top-left');
-		popup.setPosition(coordinate);
-		
+		if (popupHTML.length > 0){
+				popup.setPosition(coordinate);
+		}
 	};
-	
-	map.on('click', function(evt) {
-		show_feature_info(evt.pixel, evt.coordinate);
-	});
+	map.on('pointermove', function(evt) {
+        if (evt.dragging) {
+          return;
+        }
+        show_feature_info(evt.pixel,evt.coordinate);
+      });
+	  
     </script>
   </body>
 </html>
