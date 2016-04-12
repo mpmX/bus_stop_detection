@@ -340,8 +340,8 @@ def extract_activity_pattern_around_bus_stops(bus_stops, activity_points,
                     
 
 ################################################################################
-# Hybrid bus stop detection algorithm based on data-driven activity combinations
-# and common sense combinations.                
+# Bus stop detection algorithm based on route traversing, data-driven activity
+# combinations, common sense activity combinations and local maxima detection.                
 def detect_bus_stops_traversing_approach(activity_points, routes, activity_radius=200, 
                                             step_length=50, dbscan_eps=400, out_file=None):
     ############################################################################
@@ -436,11 +436,10 @@ def detect_bus_stops_traversing_approach(activity_points, routes, activity_radiu
             raise GeoJSONError('Feature not valid!')  
     geojson.save(DATA_PATH+out_file)  
          
- 
             
-
 ################################################################################
-#
+# Bus stop detection algorithm based on data-driven activity patterns and 
+# spatial clustering.  
 def detect_bus_stops_clustering_approach(activity_points, routes, pattern_radius=150,
                                           dbscan_eps = 300, dbscan_min_points=2, out_file=None):
     ############################################################################
