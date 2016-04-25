@@ -1,4 +1,5 @@
 # Ally GIS Challenge: Bus stop detection (Solution)
+[Task URL](https://github.com/allyapp/gis-code-challenge)
 
 ### Required packages
 You need to have the following Python packages installed: <br/>
