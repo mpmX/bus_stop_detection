@@ -65,6 +65,11 @@ Unfortunately, I had not enough time to evaluate the best parameter settings in 
 
 Furthermore, I've created some charts which helped me to understand the data. They will show up after the bus stop detection is finished.
 
+#### Screenshots
+![activity matrix](/screenshots/activity_matrix.png?raw=true)
+![activity matrix](/screenshots/data_profiling.png?raw=true)
+![activity matrix](/screenshots/results1.PNG?raw=true)
+![activity matrix](/screenshots/results2.PNG?raw=true)
 
 
 
